@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/dashboard.css" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 bg-gray-100">
+    <div class="flex items-center justify-between w-full max-w-6xl mb-6">
+        <a href="#" id="grafanaDashboardBtn" target="_blank" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center">
+            <svg xmlns="http://www.w.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mr-2">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zM10.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm3 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-6 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm3 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm3 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-6 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm3 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm3 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+            </svg>
+            Grafana Dashboard
+        </a>
+        <h1 class="text-3xl font-bold text-gray-800">Kubernetes Cluster Dashboard</h1>
+    </div>
+
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-6xl">
+        <!-- Tab Navigation -->
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <a href="#" id="overviewTab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                    Overview
+                </a>
+                <a href="#" id="resourceFlowTab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    Resource Flow
+                </a>
+                <a href="#" id="accessControlTab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    Access Control
+                </a>
+            </nav>
+        </div>
+
+        <!-- Overview Content -->
+        <div id="overviewContent">
+            <div class="flex items-center my-6">
+                <label for="namespaceSelect" class="text-gray-700 font-medium mr-2">Namespace:</label>
+                <select id="namespaceSelect" class="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out">
+                    <option value="default">default</option>
+                </select>
+                <button id="addNamespaceBtn" class="ml-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">+ Add Namespace</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">Worker Nodes (<span id="currentNodesCount">Loading...</span>)</h3>
+                        <button id="refreshNodesBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Nodes">
+                            &#x21bb; Refresh
+                        </button>
+                    </div>
+                    <div id="workerNodesList" class="max-h-60 overflow-y-auto space-y-2">
+                        <p class="text-gray-600">Loading worker nodes...</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">Pods (<span id="currentPodsCount">Loading...</span>)</h3>
+                        <button id="refreshPodsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Pods">
+                            &#x21bb; Refresh
+                        </button>
+                    </div>
+                    <div id="podsList" class="max-h-60 overflow-y-auto space-y-2">
+                        <p class="text-gray-600">Loading pods...</p>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button id="createPodBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out">
+                            Create Pod
+                        </button>
+                        <button id="viewPodLogsBtn" disabled class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                            View Logs
+                        </button>
+                        <button id="deleteSelectedPodBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                            Delete Selected Pod
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 text-center">Deployment Management</h2>
+            
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 mt-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-700">Existing Deployments (<span id="currentDeploymentsCount">Loading...</span>)</h3>
+                    <button id="refreshDeploymentsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Deployments">
+                        &#x21bb; Refresh
+                    </button>
+                </div>
+                <div id="deploymentsList" class="max-h-60 overflow-y-auto space-y-2">
+                    <p class="text-gray-600">Loading deployments...</p>
+                </div>
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button id="createDeploymentBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Create New Deployment
+                    </button>
+                    <button id="scaleDeploymentBtn" disabled class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        Scale Deployment
+                    </button>
+                    <button id="exposeDeploymentBtn" disabled class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        Expose Deployment (Service)
+                    </button>
+                    <button id="deleteSelectedDeploymentsBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        Delete Selected Deployments
+                    </button>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 text-center">Service Management</h2>
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 mt-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-700">Existing Services (<span id="currentServicesCount">Loading...</span>)</h3>
+                    <button id="refreshServicesBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Services">
+                        &#x21bb; Refresh
+                    </button>
+                </div>
+                <div id="servicesList" class="max-h-60 overflow-y-auto space-y-2">
+                    <p class="text-gray-600">Loading services...</p>
+                </div>
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button id="deleteSelectedServicesBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        Delete Selected Services
+                    </button>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 text-center">Ingress Management</h2>
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 mt-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-700">Existing Ingresses (<span id="currentIngressesCount">Loading...</span>)</h3>
+                    <button id="refreshIngressesBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Ingresses">
+                        &#x21bb; Refresh
+                    </button>
+                </div>
+                <div id="ingressesList" class="max-h-60 overflow-y-auto space-y-2">
+                    <p class="text-gray-600">Loading ingresses...</p>
+                </div>
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button id="createIngressBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Create Ingress
+                    </button>
+                    <button id="deleteSelectedIngressesBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        Delete Selected Ingresses
+                    </button>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 text-center">Storage Management (PVCs & PVs)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">Persistent Volume Claims (<span id="currentPvcCount">Loading...</span>)</h3>
+                        <button id="refreshPvcBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh PVCs">
+                            &#x21bb; Refresh
+                        </button>
+                    </div>
+                    <div id="pvcList" class="max-h-60 overflow-y-auto space-y-2">
+                        <p class="text-gray-600">Loading PVCs...</p>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button id="createPvcBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out">
+                            Create PVC
+                        </button>
+                        <button id="deleteSelectedPvcBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                            Delete Selected PVCs
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">Persistent Volumes (<span id="currentPvCount">Loading...</span>)</h3>
+                        <button id="refreshPvBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh PVs">
+                            &#x21bb; Refresh
+                        </button>
+                    </div>
+                    <div id="pvList" class="max-h-60 overflow-y-auto space-y-2">
+                        <p class="text-gray-600">Loading PVs...</p>
+                    </div>
+                    </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 text-center">StorageClass Management</h2>
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-700">StorageClasses</h3>
+                    <button id="refreshStorageClassesBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh StorageClasses">
+                        &#x21bb; Refresh
+                    </button>
+                    <button id="openCreateStorageClassModalBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        + Create StorageClass
+                    </button>
+                </div>
+                <div id="storageClassList" class="max-h-60 overflow-y-auto space-y-2">
+                    <p class="text-gray-600">Loading StorageClasses...</p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 text-center">Configuration Management</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">ConfigMaps (<span id="currentConfigMapCount">...</span>)</h3>
+                        <button id="refreshConfigMapsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh ConfigMaps">
+                            &#x21bb; Refresh
+                        </button>
+                    </div>
+                    <div id="configMapList" class="max-h-60 overflow-y-auto space-y-2">
+                        <p class="text-gray-600">Loading ConfigMaps...</p>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button id="createConfigMapBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md shadow-sm">Create ConfigMap</button>
+                        <button id="deleteSelectedConfigMapBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm disabled:opacity-50">Delete Selected</button>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">Secrets (<span id="currentSecretCount">...</span>)</h3>
+                        <button id="refreshSecretsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Secrets">
+                            &#x21bb; Refresh
+                        </button>
+                    </div>
+                    <div id="secretList" class="max-h-60 overflow-y-auto space-y-2">
+                        <p class="text-gray-600">Loading Secrets...</p>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button id="createSecretBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-md shadow-sm">Create Secret</button>
+                        <button id="deleteSelectedSecretBtn" disabled class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md shadow-sm disabled:opacity-50">Delete Selected</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Resource Flow Content -->
+        <div id="resourceFlowContent" class="hidden mt-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Resource Flow Visualization</h2>
+            <div class="flex justify-end mb-4">
+                <button id="refreshTreeViewBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Tree View">
+                    &#x21bb; Refresh
+                </button>
+            </div>
+            <div id="treeContainer" class="w-full h-[70vh] border rounded-lg bg-gray-50 overflow-hidden relative">
+                <!-- D3.js will render the SVG here -->
+            </div>
+            <div id="tooltip" class="tooltip bg-gray-800 text-white p-2 rounded-md shadow-lg text-xs"></div>
+        </div>
+
+        <!-- NEW: Access Control Content -->
+        <div id="accessControlContent" class="hidden mt-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">User Access Control (IAM to RBAC)</h2>
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-700">User Mappings</h3>
+                    <div>
+                        <button id="refreshUserMappingsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out flex items-center" title="Refresh Mappings">
+                            &#x21bb; Refresh
+                        </button>
+                        <button id="addUserMappingBtn" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm">
+                            + Add New User Mapping
+                        </button>
+                    </div>
+                </div>
+                <div id="userMappingsList" class="mt-4 space-y-2">
+                    <p class="text-gray-600">Loading user mappings...</p>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="flex justify-center mt-8">
+            <a href="/" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                Back to EKS Management
+            </a>
+        </div>
+    </div>
+
+    <div id="messageContainer"></div>
+
+    <!-- NEW: User Mapping Modal -->
+    <div id="userMappingModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Add New User Mapping</h3>
+            <form id="userMappingForm" class="space-y-4">
+                <div>
+                    <label for="iamRoleArn" class="block text-gray-700 font-medium mb-1">AWS IAM Role ARN:</label>
+                    <input type="text" id="iamRoleArn" name="iamRoleArn" required class="w-full p-2 border border-gray-300 rounded-md" placeholder="arn:aws:iam::123456789012:role/MyRole" />
+                </div>
+                <div>
+                    <label for="kubernetesUsername" class="block text-gray-700 font-medium mb-1">Kubernetes Username:</label>
+                    <input type="text" id="kubernetesUsername" name="kubernetesUsername" required class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., developer-jane" />
+                </div>
+                <div>
+                    <label for="mappingNamespace" class="block text-gray-700 font-medium mb-1">Namespace:</label>
+                    <select id="mappingNamespace" name="mappingNamespace" required class="w-full p-2 border border-gray-300 rounded-md bg-white"></select>
+                </div>
+                <hr class="my-4"/>
+                <h4 class="text-lg font-semibold text-gray-700">Define Permissions (Power)</h4>
+                <div>
+                    <label for="roleName" class="block text-gray-700 font-medium mb-1">Power / Role Name:</label>
+                    <input type="text" id="roleName" name="roleName" required class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., pod-viewer-role" />
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Permissions:</label>
+                    <div id="permissionsContainer" class="space-y-2 p-2 border rounded-md bg-gray-50">
+                        <!-- Dynamic permission rules will be added here -->
+                    </div>
+                    <button type="button" id="addPermissionRuleBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">+ Add Rule</button>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeUserMappingModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Create Mapping</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="createNamespaceModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-lg">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create New Namespace</h3>
+            <form id="createNamespaceForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="namespaceName" class="text-gray-700 font-medium mb-1">Namespace Name:</label>
+                    <input type="text" id="namespaceName" name="namespaceName" placeholder="e.g., my-app-namespace" required class="p-3 border border-gray-300 rounded-md"/>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-2">Resource Quotas (Optional)</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="text" name="pods" placeholder="Total Pods (e.g., 10)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="requests.storage" placeholder="Total Storage Requests (e.g., 100Gi)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="requests.cpu" placeholder="Total CPU Requests (e.g., 10)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="limits.cpu" placeholder="Total CPU Limits (e.g., 20)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="requests.memory" placeholder="Total Memory Requests (e.g., 20Gi)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="limits.memory" placeholder="Total Memory Limits (e.g., 40Gi)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="configmaps" placeholder="Total ConfigMaps (e.g., 20)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="secrets" placeholder="Total Secrets (e.g., 30)" class="p-2 border border-gray-300 rounded-md"/>
+                        <input type="text" name="services" placeholder="Total Services (e.g., 15)" class="p-2 border border-gray-300 rounded-md"/>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreateNamespaceModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="createConfigMapModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-lg">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create ConfigMap</h3>
+            <form id="createConfigMapForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="configMapName" class="text-gray-700 font-medium mb-1">ConfigMap Name:</label>
+                    <input type="text" id="configMapName" name="configMapName" placeholder="e.g., app-settings" required class="p-3 border border-gray-300 rounded-md"/>
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Data (Key-Value Pairs):</label>
+                    <div id="configMapDataContainer" class="space-y-2"></div>
+                    <button type="button" id="addConfigMapDataBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">+ Add Data</button>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreateConfigMapModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="createSecretModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-lg">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create Secret</h3>
+            <form id="createSecretForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="secretName" class="text-gray-700 font-medium mb-1">Secret Name:</label>
+                    <input type="text" id="secretName" name="secretName" placeholder="e.g., db-credentials" required class="p-3 border border-gray-300 rounded-md"/>
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Data (Key-Value Pairs):</label>
+                    <div id="secretDataContainer" class="space-y-2"></div>
+                    <button type="button" id="addSecretDataBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">+ Add Data</button>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreateSecretModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="bindPvcModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-lg">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Bind Pending PVC: <span id="bindPvcName" class="font-normal text-yellow-600"></span></h3>
+            <p class="text-gray-600 mb-4">This PVC is pending. Select a StorageClass to trigger provisioning.</p>
+            <form id="bindPvcForm" class="space-y-4">
+                <input type="hidden" id="bindPvcNamespace">
+                <input type="hidden" id="bindPvcSize">
+                <input type="hidden" id="bindPvcAccessModes">
+                <div class="flex flex-col">
+                    <label for="bindPvcStorageClassSelect" class="text-gray-700 font-medium mb-1">Select Storage Class:</label>
+                    <select id="bindPvcStorageClassSelect" name="bindPvcStorageClassSelect" required
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition duration-200 ease-in-out">
+                        </select>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeBindPvcModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Provision & Bind
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="createPvcModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-lg">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create Persistent Volume Claim</h3>
+            <form id="createPvcForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="newPvcName" class="text-gray-700 font-medium mb-1">PVC Name:</label>
+                    <input type="text" id="newPvcName" name="newPvcName" placeholder="e.g., my-database-pvc" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="newPvcStorageSize" class="text-gray-700 font-medium mb-1">Storage Size (e.g., 5Gi, 500Mi):</label>
+                    <input type="text" id="newPvcStorageSize" name="newPvcStorageSize" value="1Gi" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="newPvcAccessMode" class="text-gray-700 font-medium mb-1">Access Mode:</label>
+                    <select id="newPvcAccessMode" name="newPvcAccessMode" required
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition duration-200 ease-in-out">
+                        <option value="ReadWriteOnce">ReadWriteOnce (RWO)</option>
+                        <option value="ReadOnlyMany">ReadOnlyMany (ROX)</option>
+                        <option value="ReadWriteMany">ReadWriteMany (RWX)</option>
+                    </select>
+                </div>
+                <div class="flex flex-col">
+                    <label for="newPvcStorageClass" class="text-gray-700 font-medium mb-1">Storage Class (optional):</label>
+                    <select id="newPvcStorageClass" name="newPvcStorageClass"
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-green-400 focus:border-transparent transition duration-200 ease-in-out">
+                        </select>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreatePvcModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Create PVC
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="createStorageClassModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
+        <div class="modal-content w-11/12 max-w-lg relative">
+            <button id="closeCreateStorageClassModalBtn" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Create StorageClass</h3>
+            <form id="createStorageClassForm" class="space-y-4">
+                <div>
+                    <label for="scName" class="block text-gray-700 font-medium mb-1">Name:</label>
+                    <input type="text" id="scName" name="scName" required class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., fast-storage" />
+                </div>
+                <div>
+                    <label for="scProvisioner" class="block text-gray-700 font-medium mb-1">Provisioner:</label>
+                    <input type="text" id="scProvisioner" name="scProvisioner" required class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., kubernetes.io/aws-ebs" />
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-medium mb-1">Parameters (optional):</label>
+                    <div id="scParametersContainer" class="space-y-2"></div>
+                    <button type="button" id="addScParameterBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">+ Add Parameter</button>
+                </div>
+                <div>
+                    <label for="scReclaimPolicy" class="block text-gray-700 font-medium mb-1">Reclaim Policy (optional):</label>
+                    <input type="text" id="scReclaimPolicy" name="scReclaimPolicy" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., Delete or Retain" />
+                </div>
+                <div>
+                    <label for="scVolumeBindingMode" class="block text-gray-700 font-medium mb-1">Volume Binding Mode (optional):</label>
+                    <input type="text" id="scVolumeBindingMode" name="scVolumeBindingMode" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., Immediate or WaitForFirstConsumer" />
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="scAllowVolumeExpansion" name="scAllowVolumeExpansion" class="form-checkbox h-4 w-4 text-blue-600" />
+                    <label for="scAllowVolumeExpansion" class="text-gray-700 font-medium">Allow Volume Expansion</label>
+                </div>
+                <div class="flex justify-end space-x-2 mt-4">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Create</button>
+                    <button type="button" id="cancelCreateStorageClassBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-2 px-4 rounded">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="createPodModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create New Pod</h3>
+            <form id="createPodForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="podName" class="text-gray-700 font-medium mb-1">Pod Name (Prefix):</label>
+                    <input type="text" id="podName" name="podName" placeholder="e.g., my-nginx-pod" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="podImage" class="text-gray-700 font-medium mb-1">Image Name:</label>
+                    <input type="text" id="podImage" name="podImage" placeholder="e.g., nginx:latest" value="nginx:latest" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="numPods" class="text-gray-700 font-medium mb-1">Number of Pods to Launch:</label>
+                    <input type="number" id="numPods" name="numPods" value="1" min="1" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="podCommand" class="text-gray-700 font-medium mb-1">Command to Run (optional):</label>
+                    <input type="text" id="podCommand" name="podCommand" placeholder="e.g., sleep infinity or tail -f /dev/null"
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="podCpuRequest" class="text-gray-700 font-medium mb-1">CPU Request (e.g., 100m, 0.5):</label>
+                        <input type="text" id="podCpuRequest" name="podCpuRequest" placeholder="e.g., 100m"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="podCpuLimit" class="text-gray-700 font-medium mb-1">CPU Limit (e.g., 200m, 1):</label>
+                        <input type="text" id="podCpuLimit" name="podCpuLimit" placeholder="e.g., 200m"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="podMemoryRequest" class="text-gray-700 font-medium mb-1">Memory Request (e.g., 64Mi, 0.1Gi):</label>
+                        <input type="text" id="podMemoryRequest" name="podMemoryRequest" placeholder="e.g., 64Mi"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="podMemoryLimit" class="text-gray-700 font-medium mb-1">Memory Limit (e.g., 128Mi, 0.2Gi):</label>
+                        <input type="text" id="podMemoryLimit" name="podMemoryLimit" placeholder="e.g., 128Mi"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="enablePodPvc" name="enablePodPvc" class="form-checkbox h-4 w-4 text-blue-600">
+                    <label for="enablePodPvc" class="text-gray-700 font-medium">Attach Existing Persistent Volume Claim</label>
+                </div>
+                <div id="podPvcFields" class="space-y-4 pl-6 border-l-2 border-blue-200 hidden">
+                    <div class="flex flex-col">
+                        <label for="podPvcSelect" class="text-gray-700 font-medium mb-1">Select Existing PVC:</label>
+                        <select id="podPvcSelect" name="podPvcSelect"
+                                class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out">
+                            </select>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="podVolumeMountPath" class="text-gray-700 font-medium mb-1">Volume Mount Path (e.g., /app/data):</label>
+                        <input type="text" id="podVolumeMountPath" name="podVolumeMountPath" placeholder="e.g., /app/data"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="podVolumeSubPath" class="text-gray-700 font-medium mb-1">Volume SubPath (optional, e.g., my-subdir):</label>
+                        <input type="text" id="podVolumeSubPath" name="podVolumeSubPath" placeholder="e.g., my-subdir"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+
+
+                <div class="flex flex-col">
+                    <label class="text-gray-700 font-medium mb-2">Environment Variables:</label>
+                    <div id="envVarsContainer" class="space-y-2">
+                        </div>
+                    <div id="podEnvFromContainer" class="space-y-2 mt-2">
+                        </div>
+                    <div class="flex space-x-2 mt-2">
+                        <button type="button" id="addEnvVarBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm self-start">Add Variable</button>
+                        <button type="button" id="podAddEnvFromConfigMapBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm self-start">Add from ConfigMap</button>
+                        <button type="button" id="podAddEnvFromSecretBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm self-start">Add from Secret</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-gray-700 font-medium mb-2">Labels:</label>
+                    <div id="labelsContainer" class="space-y-2">
+                        </div>
+                    <button type="button" id="addLabelBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out self-start">
+                        Add Label
+                    </button>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreatePodModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Create Pod
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="createDeploymentModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create New Deployment</h3>
+            <form id="createDeploymentForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="deploymentName" class="text-gray-700 font-medium mb-1">Deployment Name:</label>
+                    <input type="text" id="deploymentName" name="deploymentName" placeholder="e.g., my-nginx-deployment" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="deploymentImage" class="text-gray-700 font-medium mb-1">Image Name:</label>
+                    <input type="text" id="deploymentImage" name="deploymentImage" placeholder="e.g., nginx:latest" value="nginx:latest" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="deploymentReplicas" class="text-gray-700 font-medium mb-1">Number of Replicas:</label>
+                    <input type="number" id="deploymentReplicas" name="deploymentReplicas" value="1" min="1" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="deploymentCpuRequest" class="text-gray-700 font-medium mb-1">CPU Request (e.g., 100m, 0.5):</label>
+                        <input type="text" id="deploymentCpuRequest" name="deploymentCpuRequest" placeholder="e.g., 100m"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="deploymentCpuLimit" class="text-gray-700 font-medium mb-1">CPU Limit (e.g., 200m, 1):</label>
+                        <input type="text" id="deploymentCpuLimit" name="deploymentCpuLimit" placeholder="e.g., 200m"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="deploymentMemoryRequest" class="text-gray-700 font-medium mb-1">Memory Request (e.g., 64Mi, 0.1Gi):</label>
+                        <input type="text" id="deploymentMemoryRequest" name="deploymentMemoryRequest" placeholder="e.g., 64Mi"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="deploymentMemoryLimit" class="text-gray-700 font-medium mb-1">Memory Limit (e.g., 128Mi, 0.2Gi):</label>
+                        <input type="text" id="deploymentMemoryLimit" name="deploymentMemoryLimit" placeholder="e.g., 128Mi"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="enableDeploymentPvc" name="enableDeploymentPvc" class="form-checkbox h-4 w-4 text-purple-600">
+                    <label for="enableDeploymentPvc" class="text-gray-700 font-medium">Attach Existing Persistent Volume Claim</label>
+                </div>
+                <div id="deploymentPvcFields" class="space-y-4 pl-6 border-l-2 border-purple-200 hidden">
+                    <div class="flex flex-col">
+                        <label for="deploymentPvcSelect" class="text-gray-700 font-medium mb-1">Select Existing PVC:</label>
+                        <select id="deploymentPvcSelect" name="deploymentPvcSelect"
+                                class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out">
+                            </select>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="deploymentVolumeMountPath" class="text-gray-700 font-medium mb-1">Volume Mount Path (e.g., /app/data):</label>
+                        <input type="text" id="deploymentVolumeMountPath" name="deploymentVolumeMountPath" placeholder="e.g., /app/data"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="deploymentVolumeSubPath" class="text-gray-700 font-medium mb-1">Volume SubPath (optional, e.g., my-subdir):</label>
+                        <input type="text" id="deploymentVolumeSubPath" name="deploymentVolumeSubPath" placeholder="e.g., my-subdir"
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-gray-700 font-medium mb-2">Environment Variables:</label>
+                    <div id="deploymentEnvVarsContainer" class="space-y-2">
+                        </div>
+                    <div id="deploymentEnvFromContainer" class="space-y-2 mt-2">
+                        </div>
+                    <div class="flex space-x-2 mt-2">
+                        <button type="button" id="addDeploymentEnvVarBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm self-start">Add Variable</button>
+                        <button type="button" id="deploymentAddEnvFromConfigMapBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm self-start">Add from ConfigMap</button>
+                        <button type="button" id="deploymentAddEnvFromSecretBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm self-start">Add from Secret</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-gray-700 font-medium mb-2">Labels:</label>
+                    <div id="deploymentLabelsContainer" class="space-y-2">
+                        </div>
+                    <button type="button" id="addDeploymentLabelBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out self-start">
+                        Add Label
+                    </button>
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="deploymentStrategy" class="text-gray-700 font-medium mb-1">Deployment Strategy:</label>
+                    <select id="deploymentStrategy" name="deploymentStrategy" required
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-purple-400 focus:border-transparent transition duration-200 ease-in-out">
+                        <option value="RollingUpdate">Rolling Update (Default)</option>
+                        <option value="Blue/Green">Blue/Green (New Version)</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreateDeploymentModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Create Deployment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deploymentDetailsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Deployment Details: <span id="detailsDeploymentName" class="font-normal text-blue-700"></span></h3>
+            <div id="deploymentDetailsContent" class="flex-grow bg-gray-50 rounded-md overflow-auto p-4 text-sm space-y-2">
+                </div>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closeDeploymentDetailsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="scaleDeploymentModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-md">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Scale Deployment: <span id="scaleDeploymentName" class="font-normal text-blue-700"></span></h3>
+            <form id="scaleDeploymentForm" class="space-y-4">
+                <input type="hidden" id="scaleDeploymentNamespace" name="scaleDeploymentNamespace">
+                <div class="flex flex-col">
+                    <label for="currentReplicas" class="text-gray-700 font-medium mb-1">Current Replicas:</label>
+                    <input type="number" id="currentReplicas" name="currentReplicas" readonly
+                           class="p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed text-gray-700"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="newReplicas" class="text-gray-700 font-medium mb-1">New Desired Replicas:</label>
+                    <input type="number" id="newReplicas" name="newReplicas" value="1" min="0" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeScaleDeploymentModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Scale
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="exposeServiceModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Expose Deployment as Service</h3>
+            <form id="exposeServiceForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="serviceDeploymentName" class="text-gray-700 font-medium mb-1">Deployment Name:</label>
+                    <input type="text" id="serviceDeploymentName" name="serviceDeploymentName" readonly
+                           class="p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed text-gray-700"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="serviceName" class="text-gray-700 font-medium mb-1">Service Name:</label>
+                    <input type="text" id="serviceName" name="serviceName" placeholder="e.g., my-nginx-service" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="serviceType" class="text-gray-700 font-medium mb-1">Service Type:</label>
+                    <select id="serviceType" name="serviceType" required
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition duration-200 ease-in-out">
+                        <option value="ClusterIP">ClusterIP (Default)</option>
+                        <option value="NodePort">NodePort</option>
+                        <option value="LoadBalancer">LoadBalancer</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="appPort" class="text-gray-700 font-medium mb-1">App Port (Container Port):</label>
+                        <input type="number" id="appPort" name="appPort" value="80" min="1" max="65535" required
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="targetPort" class="text-gray-700 font-medium mb-1">Target Port (Service Port):</label>
+                        <input type="number" id="targetPort" name="targetPort" value="80" min="1" max="65535" required
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <label for="protocol" class="text-gray-700 font-medium mb-1">Protocol:</label>
+                    <select id="protocol" name="protocol" required
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition duration-200 ease-in-out">
+                        <option value="TCP">TCP</option>
+                        <option value="UDP">UDP</option>
+                    </select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-gray-700 font-medium mb-2">Selector (Deployment Labels):</label>
+                    <div id="serviceSelectorContainer" class="space-y-2">
+                        </div>
+                    <button type="button" id="addServiceSelectorBtn" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-md shadow-sm transition duration-200 ease-in-out self-start">
+                        Add Custom Selector
+                    </button>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeExposeServiceModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Expose Service
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="createIngressModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-lg">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Create New Ingress</h3>
+            <form id="createIngressForm" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="ingressName" class="text-gray-700 font-medium mb-1">Ingress Name:</label>
+                    <input type="text" id="ingressName" name="ingressName" placeholder="e.g., my-app-ingress" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="flex flex-col">
+                    <label for="ingressServiceSelect" class="text-gray-700 font-medium mb-1">Target Service:</label>
+                    <select id="ingressServiceSelect" name="ingressServiceSelect" required
+                            class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-teal-400 focus:border-transparent transition duration-200 ease-in-out">
+                        </select>
+                </div>
+                <div class="flex flex-col">
+                    <label for="ingressServicePort" class="text-gray-700 font-medium mb-1">Service Port:</label>
+                    <input type="number" id="ingressServicePort" name="ingressServicePort" placeholder="e.g., 80" required
+                           class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="ingressPath" class="text-gray-700 font-medium mb-1">Path:</label>
+                        <input type="text" id="ingressPath" name="ingressPath" value="/" required
+                               class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-400 focus:border-transparent transition duration-200 ease-in-out"/>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="ingressPathType" class="text-gray-700 font-medium mb-1">Path Type:</label>
+                        <select id="ingressPathType" name="ingressPathType" required
+                                class="p-3 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-teal-400 focus:border-transparent transition duration-200 ease-in-out">
+                            <option value="Prefix">Prefix</option>
+                            <option value="Exact">Exact</option>
+                            <option value="ImplementationSpecific">ImplementationSpecific</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="closeCreateIngressModalBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                        Create Ingress
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="serviceDetailsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Service Details: <span id="detailsServiceName" class="font-normal text-blue-700"></span></h3>
+            <div id="serviceDetailsContent" class="flex-grow bg-gray-50 rounded-md overflow-auto p-4 text-sm space-y-2">
+                </div>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closeServiceDetailsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="podDetailsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Pod Details: <span id="detailsPodName" class="font-normal text-blue-700"></span></h3>
+            <div id="podDetailsContent" class="flex-grow bg-gray-50 rounded-md overflow-auto p-4 text-sm space-y-2">
+                </div>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closePodDetailsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="podLogsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-4xl h-[80vh] flex flex-col p-2.5">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Pod Logs: <span id="logsPodName" class="font-normal text-blue-700"></span></h3>
+            <pre id="podLogsOutput" class="flex-grow bg-black text-white rounded-md overflow-auto p-4 text-sm"></pre>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closePodLogsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pvcDetailsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">PVC Details: <span id="detailsPvcName" class="font-normal text-blue-700"></span></h3>
+            <div id="pvcDetailsContent" class="flex-grow bg-gray-50 rounded-md overflow-auto p-4 text-sm space-y-2">
+                </div>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closePvcDetailsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pvDetailsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">PV Details: <span id="detailsPvName" class="font-normal text-blue-700"></span></h3>
+            <div id="pvDetailsContent" class="flex-grow bg-gray-50 rounded-md overflow-auto p-4 text-sm space-y-2">
+                </div>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closePvDetailsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="storageClassDetailsModal" class="modal-overlay hidden">
+        <div class="modal-content w-11/12 max-w-2xl">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">StorageClass Details: <span id="detailsStorageClassName" class="font-normal text-blue-700"></span></h3>
+            <div id="storageClassDetailsContent" class="flex-grow bg-gray-50 rounded-md overflow-auto p-4 text-sm space-y-2">
+                </div>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" id="closeStorageClassDetailsModalBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmationModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Confirm Action</h3>
+            <p id="confirmMessage" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" id="cancelConfirmBtn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Cancel
+                </button>
+                <button type="button" id="confirmActionBtn"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-200 ease-in-out">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard-app.js" type="module"></script>
+</body>
+</html>

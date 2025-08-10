@@ -1,0 +1,141 @@
+/* public/css/main.css */
+/* This file contains general styling for the main Kubernetes Management UI (index.html). */
+/* It includes styles for the body, modals, and message boxes. */
+
+body {
+    font-family: "Inter", sans-serif;
+    background-color: #f0f2f5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+}
+
+/* Preformatted text (e.g., for console output) */
+pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Modal Overlay Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Ensure modal is on top of other content */
+}
+
+/* Modal Content Styles */
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.75rem; /* rounded-lg */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+    width: 90%; /* Responsive width */
+    max-width: 600px; /* Max width for consistency across modals */
+    max-height: 80vh; /* Set max-height for scrolling content within the modal */
+    overflow-y: auto; /* Enable vertical scrolling if content overflows */
+}
+
+/* Styles for the sliding message box (toast notifications) */
+#messageContainer {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000; /* Ensure messages are on top */
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem; /* Space between multiple messages */
+    max-width: 350px; /* Limit width of message boxes */
+}
+
+.message-box {
+    position: relative;
+    padding: 1rem 2.5rem 1rem 1rem; /* Padding, leave space for close button */
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    opacity: 0; /* Start invisible for animation */
+    transform: translateX(100%); /* Start off-screen for slide-in */
+    animation: slideIn 0.5s forwards; /* Slide-in animation */
+    word-wrap: break-word; /* Ensure long words break */
+}
+
+/* Error message specific styles */
+.message-box.error {
+    background-color: #fee2e2; /* red-100 */
+    color: #ef4444; /* red-500 */
+    border: 1px solid #fca5a5; /* red-300 */
+}
+
+/* Success message specific styles */
+.message-box.success {
+    background-color: #d1fae5; /* green-100 */
+    color: #10b981; /* green-600 */
+    border: 1px solid #a7f3d0; /* green-300 */
+}
+
+/* Close button for message boxes */
+.message-box .close-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit; /* Inherit color from parent message-box */
+    line-height: 1;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s ease;
+}
+
+.message-box .close-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1); /* Slight background on hover */
+}
+
+/* Keyframe animation for sliding messages */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Table styles (for displaying cluster lists) */
+.kube-table {
+    width: 100%;
+    border-collapse: collapse; /* Collapse borders for a clean look */
+    margin-top: 1rem;
+    font-size: 0.875rem; /* text-sm */
+}
+.kube-table th, .kube-table td {
+    border: 1px solid #e2e8f0; /* gray-200 */
+    padding: 0.75rem;
+    text-align: left;
+}
+.kube-table th {
+    background-color: #f8fafc; /* gray-50 */
+    font-weight: 600; /* font-semibold */
+    color: #4a5568; /* gray-700 */
+    position: sticky; /* Keep header visible on scroll */
+    top: 0;
+    z-index: 1;
+}
+.kube-table tbody tr:nth-child(even) {
+    background-color: #f8fafc; /* gray-50 for alternating rows */
+}
+.kube-table tbody tr:hover {
+    background-color: #edf2f7; /* gray-100 on hover */
+}
